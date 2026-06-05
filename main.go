@@ -19,7 +19,7 @@ func main() {
 	cmds.Register("login", config.HandlerLogin)
 	if len(os.Args) < 2 {
 		fmt.Println("Please provide a command")
-		return
+		os.Exit(1)
 	}
 	cmdName := os.Args[1]
 	cmdArgs := os.Args[2:]

@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 type State struct {
 	Config *Config
@@ -17,7 +20,10 @@ type Commands struct {
 
 func HandlerLogin(s *State, cmd Command) error {
 	if len(cmd.Arguments) < 1 {
-		return fmt.Errorf("username argument is required")
+		if err := fmt.Errorf("username argument is required for login command"); err != nil {
+			fmt.Printf("error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 	username := cmd.Arguments[0]
 	if err := s.Config.SetUser(username); err != nil {
