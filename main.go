@@ -29,6 +29,8 @@ func main() {
 		Handlers: make(map[string]func(*config.State, config.Command) error)}
 	cmds.Register("login", config.HandlerLogin)
 	cmds.Register("register", config.HandlerRegister)
+	cmds.Register("reset", config.HandlerReset)
+	cmds.Register("users", config.Handlerusers)
 	if len(os.Args) < 2 {
 		fmt.Println("Please provide a command")
 		os.Exit(1)

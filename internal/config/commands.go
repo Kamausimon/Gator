@@ -77,6 +77,31 @@ func HandlerRegister(s *State, cmd Command) error {
 	return nil
 }
 
+func HandlerReset(s *State, cmd Command) error {
+	ctx := context.Background()
+	if err := s.Db.DeleteAllUsers(ctx); err != nil {
+		return fmt.Errorf("failed to delete all users: %w", err)
+	}
+	fmt.Println("all users have been deleted")
+	return nil
+}
+
+func Handlerusers(s *State, cmd Command) error {
+	ctx := context.Background()
+	users, err := s.Db.GetUsers(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get users: %w", err)
+	}
+	for _, user := range users {
+		if user.Name == s.Config.CurrentUserName {
+			fmt.Printf("* %s (current)\n", user.Name)
+		} else {
+			fmt.Printf("  %s\n", user.Name)
+		}
+	}
+	return nil
+}
+
 // if it does not exist
 func (c *Commands) Register(name string, handler func(*State, Command) error) {
 	if c.Handlers == nil {
