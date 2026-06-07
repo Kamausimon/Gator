@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Kamausimon/gator/internal/database"
+	"github.com/Kamausimon/gator/internal/rss"
 	"github.com/google/uuid"
 )
 
@@ -99,6 +100,63 @@ func Handlerusers(s *State, cmd Command) error {
 			fmt.Printf("  %s\n", user.Name)
 		}
 	}
+	return nil
+}
+
+func HandlerAgg(s *State, cmd Command) error {
+	targetUrl := "https://www.wagslane.dev/index.xml"
+	feed, err := rss.FetchFeed(context.Background(), targetUrl)
+	if err != nil {
+		return fmt.Errorf("failed to fetch feed: %w", err)
+	}
+
+	// Print out some individual items to confirm inner structural parsing and HTML unescaping works
+
+	for _, item := range feed.Channel.Item {
+		fmt.Printf("%s\n", item.Title)
+		fmt.Printf("Description: %s\n", item.Description)
+
+	}
+	return nil
+}
+
+func HandlerAddFeed(s *State, cmd Command) error {
+	currentUser := s.Config.CurrentUserName
+	if currentUser == "" {
+		return fmt.Errorf("You must be logged in to access command please login first")
+	}
+
+	if len(cmd.Arguments) < 2 {
+		if err := fmt.Errorf("name and feed arguments are required"); err != nil {
+			fmt.Printf("error: %s", err)
+			os.Exit(1)
+		}
+	}
+	feedName := cmd.Arguments[0]
+	feedUrl := cmd.Arguments[1]
+
+	ctx := context.Background()
+	user, err := s.Db.GetUserByName(ctx, currentUser)
+	if err != nil {
+		return fmt.Errorf("There was an error retrieveing user from the database")
+	}
+	newFeed, err := s.Db.CreateFeed(ctx, database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		Name:      feedName,
+		UserID:    user.ID,
+		Url:       sql.NullString{String: feedUrl, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("there was an error adding the newsfeed to the db, %s", err)
+	}
+	fmt.Println("Feed successfully registered!")
+	fmt.Printf("ID:         %s\n", newFeed.ID)
+	fmt.Printf("Name:       %s\n", newFeed.Name)
+	fmt.Printf("URL:        %v\n", newFeed.Url)
+	fmt.Printf("Owner ID:   %s\n", newFeed.UserID)
+
 	return nil
 }
 

@@ -26,11 +26,15 @@ func main() {
 	dbQueries := database.New(db)
 	appState := &config.State{Config: cfg, Db: dbQueries}
 	cmds := &config.Commands{
+
 		Handlers: make(map[string]func(*config.State, config.Command) error)}
 	cmds.Register("login", config.HandlerLogin)
 	cmds.Register("register", config.HandlerRegister)
 	cmds.Register("reset", config.HandlerReset)
 	cmds.Register("users", config.Handlerusers)
+	cmds.Register("agg", config.HandlerAgg)
+	cmds.Register("addfeed", config.HandlerAddFeed)
+
 	if len(os.Args) < 2 {
 		fmt.Println("Please provide a command")
 		os.Exit(1)
