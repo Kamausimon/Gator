@@ -151,6 +151,19 @@ func HandlerAddFeed(s *State, cmd Command) error {
 	if err != nil {
 		return fmt.Errorf("there was an error adding the newsfeed to the db, %s", err)
 	}
+
+	feedID := uuid.New()
+
+	_, err = s.Db.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feedID,
+	})
+	if err != nil {
+		return fmt.Errorf("feed created successfully, but auto-follow registration failed: %w", err)
+	}
 	fmt.Println("Feed successfully registered!")
 	fmt.Printf("ID:         %s\n", newFeed.ID)
 	fmt.Printf("Name:       %s\n", newFeed.Name)
@@ -158,6 +171,95 @@ func HandlerAddFeed(s *State, cmd Command) error {
 	fmt.Printf("Owner ID:   %s\n", newFeed.UserID)
 
 	return nil
+}
+
+func HandlerFeed(s *State, cmd Command) error {
+	ctx := context.Background()
+
+	feeds, err := s.Db.ListFeedsWithUser(ctx)
+	if err != nil {
+		return fmt.Errorf("there was an error retrieving the list")
+	}
+
+	if len(feeds) == 0 {
+		fmt.Println("no feeds registred in the database")
+		return nil
+	}
+	fmt.Println("=== Registered Feeds ===")
+	for _, feed := range feeds {
+		fmt.Printf("* Name:       %s\n", feed.FeedName)
+		fmt.Printf("  URL:        %v\n", feed.Url)
+		fmt.Printf("  Created By: %s\n", feed.UserName)
+		fmt.Println("  --------------------")
+	}
+	return nil
+}
+
+func HandlerFollow(s *State, cmd Command) error {
+	if len(cmd.Arguments) < 1 {
+		if err := fmt.Errorf("url is needed as an argument"); err != nil {
+			fmt.Printf("error, %s", err)
+			os.Exit(1)
+		}
+	}
+	feedUrl := cmd.Arguments[0]
+	currentUserName := s.Config.CurrentUserName
+
+	ctx := context.Background()
+	//get the user
+	user, err := s.Db.GetUserByName(ctx, currentUserName)
+	if err != nil {
+		return fmt.Errorf("THere was an error retrieveing the user from the db")
+	}
+
+	//get the feed from the url
+	feed, err := s.Db.GetFeedByUrl(ctx, sql.NullString{String: feedUrl, Valid: true})
+	if err != nil {
+		return fmt.Errorf("There was an error getting the feed from the db %s", err)
+	}
+
+	//create the feedfollow for the user
+	feedfollow, err := s.Db.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	})
+	if err != nil {
+		return fmt.Errorf("There was an error adding the feed to the db")
+	}
+	fmt.Println("successfully created the feeedflow")
+	fmt.Printf("ID:       %s\n", feedfollow.ID)
+	fmt.Printf("User:     %s\n", feedfollow.UserName)
+	fmt.Printf("feed     %s\n", feedfollow.FeedName)
+
+	return nil
+}
+
+func HandlerFollowing(s *State, cmd Command) error {
+	currentUser := s.Config.CurrentUserName
+
+	ctx := context.Background()
+
+	userfeed, err := s.Db.GetFeedFollowsForUser(ctx, currentUser)
+	if err != nil {
+		fmt.Printf("There was an error getting the user feed follows: %s", err)
+		return nil
+	}
+
+	if len(userfeed) == 0 {
+		fmt.Println("no feed follows for this user")
+		return nil
+	}
+
+	fmt.Printf("=== Feeds Followed By %s ===\n", currentUser)
+	for _, follow := range userfeed {
+		fmt.Printf("* %s\n", follow.FeedName)
+	}
+
+	return nil
+
 }
 
 // if it does not exist

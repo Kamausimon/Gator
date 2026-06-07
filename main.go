@@ -7,11 +7,12 @@ import (
 
 	"github.com/Kamausimon/gator/internal/config"
 	"github.com/Kamausimon/gator/internal/database"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 func main() {
-
+	godotenv.Load()
 	cfg, err := config.Read()
 	if err != nil {
 		fmt.Printf("there was an error reading the config file %v", err)
@@ -34,6 +35,9 @@ func main() {
 	cmds.Register("users", config.Handlerusers)
 	cmds.Register("agg", config.HandlerAgg)
 	cmds.Register("addfeed", config.HandlerAddFeed)
+	cmds.Register("feeds", config.HandlerFeed)
+	cmds.Register("follow", config.HandlerFollow)
+	cmds.Register("following", config.HandlerFollowing)
 
 	if len(os.Args) < 2 {
 		fmt.Println("Please provide a command")
@@ -48,11 +52,11 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Config updated: %+v\n", cfg)
-	freshCfg, err := config.Read()
+	fmt.Printf("Config updated:")
+	_, err = config.Read()
 	if err != nil {
 		fmt.Printf("there was an error reading the config file after update: %v", err)
 		return
 	}
-	fmt.Printf("Config read after update: %+v\n", freshCfg)
+	fmt.Printf("Config updated successfully")
 }
