@@ -38,6 +38,7 @@ func main() {
 	cmds.Register("feeds", config.HandlerFeed)
 	cmds.Register("follow", config.HandlerFollow)
 	cmds.Register("following", config.HandlerFollowing)
+	cmds.Register("unfollow", config.HandlerUnfollow)
 
 	if len(os.Args) < 2 {
 		fmt.Println("Please provide a command")

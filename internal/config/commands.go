@@ -152,14 +152,12 @@ func HandlerAddFeed(s *State, cmd Command) error {
 		return fmt.Errorf("there was an error adding the newsfeed to the db, %s", err)
 	}
 
-	feedID := uuid.New()
-
 	_, err = s.Db.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
 		ID:        uuid.New(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		UserID:    user.ID,
-		FeedID:    feedID,
+		FeedID:    newFeed.ID,
 	})
 	if err != nil {
 		return fmt.Errorf("feed created successfully, but auto-follow registration failed: %w", err)
@@ -253,13 +251,40 @@ func HandlerFollowing(s *State, cmd Command) error {
 		return nil
 	}
 
-	fmt.Printf("=== Feeds Followed By %s ===\n", currentUser)
 	for _, follow := range userfeed {
-		fmt.Printf("* %s\n", follow.FeedName)
+		fmt.Printf("%s\n", follow.FeedName)
 	}
 
 	return nil
 
+}
+
+func HandlerUnfollow(s *State, cmd Command) error {
+	if len(cmd.Arguments) < 1 {
+		return fmt.Errorf("url argument is required")
+	}
+	currentUser := s.Config.CurrentUserName
+	ctx := context.Background()
+
+	user, err := s.Db.GetUserByName(ctx, currentUser)
+	if err != nil {
+		return fmt.Errorf("there was an error retrieving the user from the db")
+	}
+
+	feed, err := s.Db.GetFeedByUrl(ctx, sql.NullString{String: cmd.Arguments[0], Valid: true})
+	if err != nil {
+		return fmt.Errorf("there was an error retrieving the feed from the db")
+	}
+
+	err = s.Db.DeleteFeedFollowForUser(ctx, database.DeleteFeedFollowForUserParams{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	})
+	if err != nil {
+		return fmt.Errorf("there was an error deleting the feed follow: %s", err)
+	}
+	fmt.Println("successfully unfollowed the feed")
+	return nil
 }
 
 // if it does not exist
