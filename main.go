@@ -39,6 +39,7 @@ func main() {
 	cmds.Register("follow", config.HandlerFollow)
 	cmds.Register("following", config.HandlerFollowing)
 	cmds.Register("unfollow", config.HandlerUnfollow)
+	cmds.Register("agg", config.HandlerAgg)
 
 	if len(os.Args) < 2 {
 		fmt.Println("Please provide a command")

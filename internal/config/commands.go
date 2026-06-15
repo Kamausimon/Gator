@@ -104,20 +104,45 @@ func Handlerusers(s *State, cmd Command) error {
 }
 
 func HandlerAgg(s *State, cmd Command) error {
-	targetUrl := "https://www.wagslane.dev/index.xml"
-	feed, err := rss.FetchFeed(context.Background(), targetUrl)
+	if len(cmd.Arguments) < 1 {
+		return fmt.Errorf("time_between_reqs argument is required")
+	}
+	timeBetweenRequests, err := time.ParseDuration(cmd.Arguments[0])
 	if err != nil {
-		return fmt.Errorf("failed to fetch feed: %w", err)
+		return fmt.Errorf("invalid time_between_reqs duration: %w", err)
 	}
 
-	// Print out some individual items to confirm inner structural parsing and HTML unescaping works
+	fmt.Printf("Collecting feeds every %s\n", timeBetweenRequests)
 
-	for _, item := range feed.Channel.Item {
-		fmt.Printf("%s\n", item.Title)
-		fmt.Printf("Description: %s\n", item.Description)
-
+	ticker := time.NewTicker(timeBetweenRequests)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
 	}
-	return nil
+}
+
+func scrapeFeeds(s *State) {
+	ctx := context.Background()
+
+	feed, err := s.Db.GetNextFeedToFetch(ctx)
+	if err != nil {
+		fmt.Printf("error getting next feed to fetch: %v\n", err)
+		return
+	}
+
+	if _, err := s.Db.MarkFeedFetched(ctx, feed.ID); err != nil {
+		fmt.Printf("error marking feed fetched: %v\n", err)
+		return
+	}
+
+	rssFeed, err := rss.FetchFeed(ctx, feed.Url.String)
+	if err != nil {
+		fmt.Printf("error fetching feed %s: %v\n", feed.Url.String, err)
+		return
+	}
+
+	for _, item := range rssFeed.Channel.Item {
+		fmt.Printf("Found post: %s\n", item.Title)
+	}
 }
 
 func HandlerAddFeed(s *State, cmd Command) error {
