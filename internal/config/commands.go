@@ -5,11 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Kamausimon/gator/internal/database"
 	"github.com/Kamausimon/gator/internal/rss"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type State struct {
@@ -141,8 +144,51 @@ func scrapeFeeds(s *State) {
 	}
 
 	for _, item := range rssFeed.Channel.Item {
-		fmt.Printf("Found post: %s\n", item.Title)
+		publishedAt := sql.NullTime{}
+		if t, err := parsePubDate(item.PubDate); err == nil {
+			publishedAt = sql.NullTime{Time: t, Valid: true}
+		}
+
+		_, err := s.Db.CreatePost(ctx, database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   sql.NullTime{Time: time.Now(), Valid: true},
+			UpdatedAt:   sql.NullTime{Time: time.Now(), Valid: true},
+			Title:       item.Title,
+			Url:         item.Link,
+			Description: sql.NullString{String: item.Description, Valid: item.Description != ""},
+			PublishedAt: publishedAt,
+			FeedID:      feed.ID,
+		})
+		if err != nil {
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+				continue
+			}
+			fmt.Printf("error saving post %q: %v\n", item.Title, err)
+			continue
+		}
+		fmt.Printf("Saved post: %s\n", item.Title)
 	}
+}
+
+var pubDateLayouts = []string{
+	time.RFC1123Z,
+	time.RFC1123,
+	time.RFC3339,
+	"2006-01-02T15:04:05Z07:00",
+	"Mon, 2 Jan 2006 15:04:05 -0700",
+}
+
+func parsePubDate(pubDate string) (time.Time, error) {
+	pubDate = strings.TrimSpace(pubDate)
+	var lastErr error
+	for _, layout := range pubDateLayouts {
+		t, err := time.Parse(layout, pubDate)
+		if err == nil {
+			return t, nil
+		}
+		lastErr = err
+	}
+	return time.Time{}, lastErr
 }
 
 func HandlerAddFeed(s *State, cmd Command) error {
@@ -309,6 +355,49 @@ func HandlerUnfollow(s *State, cmd Command) error {
 		return fmt.Errorf("there was an error deleting the feed follow: %s", err)
 	}
 	fmt.Println("successfully unfollowed the feed")
+	return nil
+}
+
+func HandlerBrowse(s *State, cmd Command) error {
+	limit := int32(2)
+	if len(cmd.Arguments) > 0 {
+		parsed, err := strconv.Atoi(cmd.Arguments[0])
+		if err != nil {
+			return fmt.Errorf("invalid limit: %w", err)
+		}
+		limit = int32(parsed)
+	}
+
+	ctx := context.Background()
+	user, err := s.Db.GetUserByName(ctx, s.Config.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("there was an error retrieving the user from the db")
+	}
+
+	posts, err := s.Db.GetPostsForUser(ctx, database.GetPostsForUserParams{
+		UserID: user.ID,
+		Limit:  limit,
+	})
+	if err != nil {
+		return fmt.Errorf("there was an error retrieving posts: %w", err)
+	}
+
+	if len(posts) == 0 {
+		fmt.Println("no posts found")
+		return nil
+	}
+
+	for _, post := range posts {
+		fmt.Printf("* %s\n", post.Title)
+		fmt.Printf("  URL:  %s\n", post.Url)
+		if post.PublishedAt.Valid {
+			fmt.Printf("  Published: %s\n", post.PublishedAt.Time.Format(time.RFC1123))
+		}
+		if post.Description.Valid {
+			fmt.Printf("  %s\n", post.Description.String)
+		}
+		fmt.Println("  --------------------")
+	}
 	return nil
 }
 
